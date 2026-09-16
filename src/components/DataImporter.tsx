@@ -16,7 +16,7 @@ import { parseCSVData, normalizeGoogleSheetUrl } from '../utils/csvParser';
 import Papa from 'papaparse';
 
 interface DataImporterProps {
-  onImportSuccess: (contacts: Contact[], headers: string[], mapping: ColumnMapping) => void;
+  onImportSuccess: (contacts: Contact[], headers: string[], mapping: ColumnMapping, rawText?: string) => void;
   defaultCountryCode: string;
   onCountryCodeChange: (code: string) => void;
   headers: string[];
@@ -75,7 +75,7 @@ export const DataImporter: React.FC<DataImporterProps> = ({
         return;
       }
 
-      onImportSuccess(result.contacts, result.headers, result.detectedMapping);
+      onImportSuccess(result.contacts, result.headers, result.detectedMapping, text);
       setSuccessInfo(`¡Cargados ${result.contacts.length} contactos desde ${sourceName}!`);
       setShowMappingDrawer(result.headers.length > 0);
     } catch (err: any) {
@@ -127,7 +127,7 @@ export const DataImporter: React.FC<DataImporterProps> = ({
     onMappingChange(updated);
     if (rawCsvText) {
       const reParsed = parseCSVData(rawCsvText, defaultCountryCode, updated);
-      onImportSuccess(reParsed.contacts, reParsed.headers, updated);
+      onImportSuccess(reParsed.contacts, reParsed.headers, updated, rawCsvText);
     }
   };
 

@@ -71,11 +71,15 @@ export default function App() {
   const handleImportSuccess = (
     newContacts: Contact[],
     newHeaders: string[],
-    newMapping: ColumnMapping
+    newMapping: ColumnMapping,
+    rawText?: string
   ) => {
     setContacts(newContacts);
     setHeaders(newHeaders);
     setCurrentMapping(newMapping);
+    if (rawText) {
+      setRawCsvText(rawText);
+    }
     if (newContacts.length > 0) {
       setSelectedContactId(newContacts[0].id);
     }

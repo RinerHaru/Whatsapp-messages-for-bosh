@@ -366,10 +366,12 @@ export function generateStandaloneHTML(): string {
       // Conversión automática a exportación CSV
       const sheetMatch = url.match(/\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
       if (sheetMatch && sheetMatch[1]) {
-        let gid = '0';
         const gidMatch = url.match(/[#&?]gid=([0-9]+)/);
-        if (gidMatch && gidMatch[1]) gid = gidMatch[1];
-        url = \`https://docs.google.com/spreadsheets/d/\${sheetMatch[1]}/export?format=csv&gid=\${gid}\`;
+        if (gidMatch && gidMatch[1]) {
+          url = \`https://docs.google.com/spreadsheets/d/\${sheetMatch[1]}/export?format=csv&gid=\${gidMatch[1]}\`;
+        } else {
+          url = \`https://docs.google.com/spreadsheets/d/\${sheetMatch[1]}/export?format=csv\`;
+        }
       }
 
       btnFetchSheet.disabled = true;

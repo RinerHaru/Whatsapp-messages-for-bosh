@@ -26,12 +26,11 @@ export function normalizeGoogleSheetUrl(inputUrl: string): string {
   const sheetIdMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (sheetIdMatch && sheetIdMatch[1]) {
     const sheetId = sheetIdMatch[1];
-    let gid = '0';
     const gidMatch = trimmed.match(/[#&?]gid=([0-9]+)/);
     if (gidMatch && gidMatch[1]) {
-      gid = gidMatch[1];
+      return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gidMatch[1]}`;
     }
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
   }
 
   return trimmed;
