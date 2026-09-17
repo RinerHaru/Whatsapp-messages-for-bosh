@@ -65,8 +65,26 @@ export function detectCountryFromDigits(digits: string): DetectedCountry | null 
 }
 
 /**
+ * Extrae el primer número de teléfono candidato de un texto que pueda contener nombres,
+ * múltiples números o anotaciones (ej. "099146354 ROBERT", "099685664 - 092757505").
+ */
+export function extractPrimaryPhone(rawStr: string): string {
+  // Si contiene separadores de teléfonos múltiples (ej: "099685664 - 092757505" o "099111222 / 099333444")
+  const multiSplit = rawStr.split(/\s*[/,;]\s*|\s+-\s+(?=\d)|\s+o\s+(?=\d)|\s+y\s+(?=\d)/i);
+  const candidate = multiSplit[0] || rawStr;
+
+  // Buscar secuencia de dígitos con posibles espacios, guiones o puntos
+  const match = candidate.match(/\+?\d[\d\s\-\.()]{6,16}\d/);
+  if (match) {
+    return match[0];
+  }
+
+  return candidate;
+}
+
+/**
  * Sanitiza y formatea el teléfono respetando el código de país que ya traiga el número.
- * NUNCA fuerza +54 salvo que el usuario lo elija explícitamente para números locales.
+ * Detecta inteligentemente formatos locales de Uruguay (09X / 9X), Argentina, etc.
  */
 export function sanitizeAndFormatPhone(
   raw: string | number | undefined | null,
@@ -81,11 +99,25 @@ export function sanitizeAndFormatPhone(
     return { formatted: '', isValid: false, error: 'Número vacío' };
   }
 
-  const hasLeadingPlus = rawStr.startsWith('+');
-  let digitsOnly = rawStr.replace(/\D/g, '');
+  // Filtrar palabras de no-contacto frecuentes como "Ninguno", "No tiene", "r", "-"
+  const lowerRaw = rawStr.toLowerCase();
+  if (
+    lowerRaw.includes('ningun') || 
+    lowerRaw.includes('no tiene') || 
+    lowerRaw.includes('sin tel') || 
+    rawStr === 'r' || 
+    rawStr === '-' || 
+    rawStr === '--'
+  ) {
+    return { formatted: '', isValid: false, error: 'Sin teléfono registrado' };
+  }
 
-  if (!digitsOnly) {
-    return { formatted: '', isValid: false, error: 'No contiene dígitos válidos' };
+  const extracted = extractPrimaryPhone(rawStr);
+  const hasLeadingPlus = extracted.trim().startsWith('+');
+  let digitsOnly = extracted.replace(/\D/g, '');
+
+  if (!digitsOnly || digitsOnly.length < 6) {
+    return { formatted: '', isValid: false, error: 'No contiene un teléfono válido' };
   }
 
   // Quitar prefijo 00 de marcación internacional si estuviese presente
@@ -96,7 +128,7 @@ export function sanitizeAndFormatPhone(
   let finalNumber = digitsOnly;
   let detected = detectCountryFromDigits(digitsOnly);
 
-  // Si ya tiene un código de país detectado (ej: 52 México, 57 Colombia, 34 España, 56 Chile, etc.)
+  // Si ya tiene un código de país detectado (ej: 598 Uruguay, 54 Argentina, 52 México, etc.)
   if (detected) {
     // Caso particular Argentina: WhatsApp exige anteponer el 9 para celulares (+54 9 ...)
     if (detected.dialCode === '54') {
@@ -104,12 +136,36 @@ export function sanitizeAndFormatPhone(
         finalNumber = '549' + finalNumber.substring(2);
       }
     }
+    // Caso particular Uruguay: Si alguien escribió 598 099..., quitar el 0
+    if (detected.dialCode === '598') {
+      if (finalNumber.startsWith('5980') && finalNumber.length === 12) {
+        finalNumber = '598' + finalNumber.substring(4);
+      }
+    }
   } else {
-    // Si NO se detectó un país conocido y tampoco vino con + (ej. número local de 7 a 10 dígitos)
     const cleanDefault = defaultCountryCode.replace(/\D/g, '');
-    
-    // Solo aplicar prefijo por defecto si el usuario especificó uno válido (distinto de 'auto', 'none' o vacío)
-    if (cleanDefault && defaultCountryCode !== 'auto' && defaultCountryCode !== 'none') {
+
+    // Detección automática para números de Uruguay sin prefijo:
+    // Celulares en Uruguay: 9 dígitos empezando en 09 (ej. 099146354) u 8 dígitos empezando en 9 (ej. 99817827)
+    const isUruguayMobile = 
+      (digitsOnly.length === 9 && digitsOnly.startsWith('09')) ||
+      (digitsOnly.length === 8 && /^9[1-9]/.test(digitsOnly));
+
+    if ((defaultCountryCode === 'auto' && isUruguayMobile) || cleanDefault === '598') {
+      let local = digitsOnly;
+      if (local.startsWith('0')) local = local.substring(1);
+      finalNumber = `598${local}`;
+      const uyCountry = SUPPORTED_COUNTRIES.find((c) => c.dialCode === '598');
+      if (uyCountry) {
+        detected = {
+          name: uyCountry.name,
+          code: uyCountry.code,
+          dialCode: uyCountry.dialCode,
+          flag: uyCountry.flag,
+        };
+      }
+    } else if (cleanDefault && defaultCountryCode !== 'auto' && defaultCountryCode !== 'none') {
+      // Aplicar prefijo explícito seleccionado por el usuario
       const defaultCountry = SUPPORTED_COUNTRIES.find((c) => c.dialCode === cleanDefault);
       
       if (cleanDefault === '54') {
@@ -119,6 +175,10 @@ export function sanitizeAndFormatPhone(
         finalNumber = `549${local}`;
       } else if (cleanDefault === '52') {
         finalNumber = `52${digitsOnly}`;
+      } else if (cleanDefault === '598') {
+        let local = digitsOnly;
+        if (local.startsWith('0')) local = local.substring(1);
+        finalNumber = `598${local}`;
       } else {
         finalNumber = `${cleanDefault}${digitsOnly}`;
       }

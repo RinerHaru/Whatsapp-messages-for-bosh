@@ -305,10 +305,11 @@ export const DataImporter: React.FC<DataImporterProps> = ({
               </select>
             </div>
 
-            {/* Columna Pedido */}
+            {/* Columna Remito / Pedido */}
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Columna de Pedido / Detalle:
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+                <span>Columna de Remito / Pedido:</span>
+                <span className="text-[10px] text-emerald-700 font-normal">Detecta empresa</span>
               </label>
               <select
                 value={currentMapping.pedidoCol}
@@ -321,6 +322,9 @@ export const DataImporter: React.FC<DataImporterProps> = ({
                   </option>
                 ))}
               </select>
+              <span className="block text-[10px] text-slate-400 mt-0.5">
+                Prefijos JC (181, 417, 135, 136) / Bosch (950, 960, 301, 304, 302)
+              </span>
             </div>
           </div>
         </div>

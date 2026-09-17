@@ -1,4 +1,5 @@
 export type ContactStatus = 'Pendiente' | 'Mensaje Generado' | 'Enviado';
+export type EmpresaTipo = 'Juan Construye' | 'Bosch & Cia';
 
 export interface Contact {
   id: string;
@@ -8,6 +9,8 @@ export interface Contact {
   telefonoValido: boolean;
   telefonoError?: string;
   pedido: string;
+  empresa?: EmpresaTipo;
+  empresaPrefix?: string;
   estado: ContactStatus;
   enviadoAt?: string;
   paisDetectado?: { name: string; flag: string; dialCode: string };

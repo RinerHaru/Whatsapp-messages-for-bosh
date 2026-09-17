@@ -112,6 +112,7 @@ export function generateStandaloneHTML(): string {
         <select id="countryPrefixSelect" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <option value="auto">🌐 Automático (Detectar de cada número)</option>
           <option value="none">🚫 Sin prefijo (Conservar original)</option>
+          <option value="598">🇺🇾 Uruguay (+598)</option>
           <option value="54">🇦🇷 Argentina (+54)</option>
           <option value="52">🇲🇽 México (+52)</option>
           <option value="34">🇪🇸 España (+34)</option>
@@ -265,12 +266,25 @@ export function generateStandaloneHTML(): string {
     // Sanitización y formateo de teléfono según requerimiento de wa.me
     const KNOWN_CODES = ['593','598','595','591','502','503','504','505','506','507','54','52','57','34','56','51','58','55','1'];
     
+    function extractPrimaryPhone(rawStr) {
+      const multiSplit = rawStr.split(/\s*[/,;]\s*|\s+-\s+(?=\d)|\s+o\s+(?=\d)|\s+y\s+(?=\d)/i);
+      const candidate = multiSplit[0] || rawStr;
+      const match = candidate.match(/\+?\d[\d\s\-\.()]{6,16}\d/);
+      return match ? match[0] : candidate;
+    }
+
     function formatPhone(rawPhone, defaultCountry = 'auto') {
       if (!rawPhone) return { formatted: '', isValid: false, error: 'Vacío' };
       const rawStr = String(rawPhone).trim();
-      let digits = rawStr.replace(/\D/g, '');
+      const lowerRaw = rawStr.toLowerCase();
+      if (lowerRaw.includes('ningun') || lowerRaw.includes('no tiene') || rawStr === 'r' || rawStr === '-' || rawStr === '--') {
+        return { formatted: '', isValid: false, error: 'Sin teléfono registrado' };
+      }
 
-      if (!digits) return { formatted: '', isValid: false, error: 'Sin dígitos' };
+      const extracted = extractPrimaryPhone(rawStr);
+      let digits = extracted.replace(/\D/g, '');
+
+      if (!digits || digits.length < 6) return { formatted: '', isValid: false, error: 'Sin dígitos válidos' };
       if (digits.startsWith('00')) digits = digits.substring(2);
 
       let finalPhone = digits;
@@ -280,16 +294,25 @@ export function generateStandaloneHTML(): string {
         if (startsWithKnown === '54' && digits.startsWith('54') && !digits.startsWith('549') && digits.length >= 12) {
           finalPhone = '549' + digits.substring(2);
         }
-      } else if (defaultCountry && defaultCountry !== 'auto' && defaultCountry !== 'none') {
-        if (defaultCountry === '54') {
-          let local = digits;
-          if (local.startsWith('15')) local = local.substring(2);
-          if (local.startsWith('0')) local = local.substring(1);
-          finalPhone = '549' + local;
-        } else if (defaultCountry === '52') {
-          finalPhone = '52' + digits;
-        } else {
-          finalPhone = defaultCountry + digits;
+        if (startsWithKnown === '598' && digits.startsWith('5980') && digits.length === 12) {
+          finalPhone = '598' + digits.substring(4);
+        }
+      } else {
+        const isUyMobile = (digits.length === 9 && digits.startsWith('09')) || (digits.length === 8 && /^9[1-9]/.test(digits));
+        if ((defaultCountry === 'auto' && isUyMobile) || defaultCountry === '598') {
+          let local = digits.startsWith('0') ? digits.substring(1) : digits;
+          finalPhone = '598' + local;
+        } else if (defaultCountry && defaultCountry !== 'auto' && defaultCountry !== 'none') {
+          if (defaultCountry === '54') {
+            let local = digits;
+            if (local.startsWith('15')) local = local.substring(2);
+            if (local.startsWith('0')) local = local.substring(1);
+            finalPhone = '549' + local;
+          } else if (defaultCountry === '52') {
+            finalPhone = '52' + digits;
+          } else {
+            finalPhone = defaultCountry + digits;
+          }
         }
       }
 
@@ -320,9 +343,25 @@ export function generateStandaloneHTML(): string {
     }
 
     function generateMessageForContact(template, contact) {
-      return template
+      let msg = template;
+      // Reemplazo dinámico de campos extra del CSV
+      if (contact.extra) {
+        for (const [k, v] of Object.entries(contact.extra)) {
+          const lk = k.toLowerCase().trim();
+          if (!['nombre', 'name', 'cliente', 'pedido', 'order', 'telefono', 'phone'].includes(lk)) {
+            msg = msg.replace(new RegExp('\\{' + k + '\\}', 'gi'), v || '');
+          }
+        }
+      }
+      // Reemplazos de máxima prioridad
+      return msg
         .replace(/{nombre}/gi, contact.nombre || 'Cliente')
+        .replace(/{name}/gi, contact.nombre || 'Cliente')
+        .replace(/{cliente}/gi, contact.nombre || 'Cliente')
         .replace(/{pedido}/gi, contact.pedido || '#000')
+        .replace(/{order}/gi, contact.pedido || '#000')
+        .replace(/{remito}/gi, contact.extra?.['Nro de Remito'] || contact.pedido || '')
+        .replace(/{factura}/gi, contact.extra?.['Nro Factura'] || '')
         .replace(/{horario}/gi, '09:00 a 19:00 hs');
     }
 
@@ -403,11 +442,37 @@ export function generateStandaloneHTML(): string {
         return;
       }
 
-      // Autodetectar columnas
-      const clean = str => str.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();
-      let nombreCol = fields.find(f => ['nombre', 'name', 'cliente', 'customer'].some(k => clean(f).includes(k))) || fields[0];
-      let telCol = fields.find(f => ['tel', 'cel', 'phone', 'whats'].some(k => clean(f).includes(k))) || fields[1];
-      let pedidoCol = fields.find(f => ['pedid', 'order', 'prod', 'item'].some(k => clean(f).includes(k))) || fields[2];
+      // Autodetectar columnas con puntuación inteligente para hojas con muchas columnas
+      const clean = str => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+      const scoreCol = (f) => {
+        const cf = clean(f);
+        let nScore = 0, pScore = 0, oScore = 0;
+        
+        // Teléfono
+        if (cf.includes('whatsapp') || cf.includes('celular') || cf.includes('movil')) pScore += 30;
+        else if (cf.includes('telefono') || cf.includes('phone') || cf.includes('contacto')) pScore += 25;
+
+        // Nombre
+        if (cf.includes('cliente/proveedor') || cf.includes('nombre de cliente') || cf.includes('nombre cliente')) nScore += 30;
+        else if (cf.includes('cliente') || cf.includes('destinatario') || cf.includes('comprador') || cf.includes('titular')) nScore += 20;
+        else if (cf === 'nombre' || cf === 'name') nScore += 10;
+        else if (cf.includes('nombre')) nScore += 5;
+        if (cf.includes('linea') || cf.includes('envio') || cf.includes('vendedor')) nScore -= 15;
+
+        // Pedido / Remito / Factura
+        if (cf.includes('nro de remito') || cf.includes('remito')) oScore += 30;
+        else if (cf.includes('nro factura') || cf.includes('factura')) oScore += 28;
+        else if (cf.includes('pedido') || cf.includes('orden') || cf.includes('order')) oScore += 25;
+        else if (cf.includes('guia') || cf.includes('comprobante') || cf.includes('despacho')) oScore += 20;
+
+        return { f, nScore, pScore, oScore };
+      };
+
+      const scored = fields.map(scoreCol);
+      const telCol = (scored.slice().sort((a,b) => b.pScore - a.pScore)[0]?.f) || fields[1] || fields[0];
+      const nombreCol = (scored.filter(s => s.f !== telCol).sort((a,b) => b.nScore - a.nScore)[0]?.f) || fields[0];
+      const pedidoCol = (scored.filter(s => s.f !== telCol && s.f !== nombreCol).sort((a,b) => b.oScore - a.oScore)[0]?.f) || fields[2] || fields[0];
 
       const prefix = countryPrefixSelect.value;
       contacts = rows.map((r, i) => {
@@ -421,7 +486,8 @@ export function generateStandaloneHTML(): string {
           isValid: phoneData.isValid,
           phoneError: phoneData.error,
           pedido: (r[pedidoCol] || '').trim(),
-          status: 'Pendiente'
+          status: 'Pendiente',
+          extra: r
         };
       });
 

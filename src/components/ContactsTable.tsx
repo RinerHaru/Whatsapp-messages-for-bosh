@@ -13,7 +13,9 @@ import {
   Check, 
   ArrowRightCircle,
   MessageCircle,
-  Globe
+  Globe,
+  Building2,
+  Building
 } from 'lucide-react';
 import { Contact, TemplateConfig } from '../types';
 import { formatMessage } from '../utils/messageFormatter';
@@ -39,23 +41,28 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
   selectedContactId,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Pendiente' | 'Enviado' | 'invalid'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Pendiente' | 'Enviado' | 'invalid' | 'Juan Construye' | 'Bosch & Cia'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Filtrado
   const filteredContacts = contacts.filter((c) => {
     // Filtro por término
+    const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch =
-      c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.pedido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.nombre.toLowerCase().includes(lowerSearch) ||
+      c.pedido.toLowerCase().includes(lowerSearch) ||
+      (c.empresa && c.empresa.toLowerCase().includes(lowerSearch)) ||
+      (c.empresaPrefix && c.empresaPrefix.includes(searchTerm)) ||
       c.telefono.includes(searchTerm) ||
       c.telefonoFormateado.includes(searchTerm);
 
     if (!matchesSearch) return false;
 
-    // Filtro por estado
+    // Filtro por pestaña o empresa
     if (statusFilter === 'all') return true;
     if (statusFilter === 'invalid') return !c.telefonoValido;
+    if (statusFilter === 'Juan Construye') return c.empresa === 'Juan Construye';
+    if (statusFilter === 'Bosch & Cia') return c.empresa === 'Bosch & Cia';
     return c.estado === statusFilter;
   });
 
@@ -140,18 +147,42 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             onClick={() => setStatusFilter('all')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               statusFilter === 'all'
-                ? 'bg-slate-900 text-white'
+                ? 'bg-slate-900 text-white shadow-2xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             Todos ({contacts.length})
           </button>
           <button
+            onClick={() => setStatusFilter('Juan Construye')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+              statusFilter === 'Juan Construye'
+                ? 'bg-amber-600 text-white shadow-2xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+            }`}
+            title="Filtrar clientes con remitos de Juan Construye (prefijos 181, 417, 135, 136)"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            Juan Construye ({contacts.filter((c) => c.empresa === 'Juan Construye').length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('Bosch & Cia')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+              statusFilter === 'Bosch & Cia'
+                ? 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
+            }`}
+            title="Filtrar clientes con remitos de Bosch & Cia (prefijos 950, 960, 301, 304, 302)"
+          >
+            <Building className="w-3.5 h-3.5" />
+            Bosch & Cia ({contacts.filter((c) => c.empresa === 'Bosch & Cia').length})
+          </button>
+          <button
             onClick={() => setStatusFilter('Pendiente')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               statusFilter === 'Pendiente'
-                ? 'bg-amber-600 text-white'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                ? 'bg-amber-600 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             Pendientes ({contacts.filter((c) => c.estado === 'Pendiente').length})
@@ -160,7 +191,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             onClick={() => setStatusFilter('Enviado')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               statusFilter === 'Enviado'
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-emerald-600 text-white shadow-2xs'
                 : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
             }`}
           >
@@ -170,7 +201,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             onClick={() => setStatusFilter('invalid')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
               statusFilter === 'invalid'
-                ? 'bg-rose-600 text-white'
+                ? 'bg-rose-600 text-white shadow-2xs'
                 : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
             }`}
           >
@@ -207,7 +238,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             <tr>
               <th className="px-4 py-3">Cliente / Nombre</th>
               <th className="px-4 py-3">Teléfono / WhatsApp</th>
-              <th className="px-4 py-3">Pedido / Detalle</th>
+              <th className="px-4 py-3">Empresa / Remito / Detalle</th>
               <th className="px-4 py-3 text-center">Estado</th>
               <th className="px-4 py-3 text-right">Acción WhatsApp</th>
             </tr>
@@ -301,11 +332,67 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                       )}
                     </td>
 
-                    {/* Pedido */}
-                    <td className="px-4 py-3 text-slate-600 max-w-xs truncate">
-                      <span className="bg-slate-50 px-2 py-1 rounded border border-slate-100 font-medium">
-                        {contact.pedido || 'Sin detalle'}
-                      </span>
+                    {/* Pedido, Empresa y detalles de la planilla */}
+                    <td className="px-4 py-3 text-slate-600 max-w-sm">
+                      <div className="space-y-1.5">
+                        {/* Indicador de Empresa */}
+                        {contact.empresa === 'Juan Construye' ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs">
+                            <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Juan Construye</span>
+                            {contact.empresaPrefix && (
+                              <span 
+                                className="text-[10px] font-mono px-1.5 py-0.2 bg-amber-200/60 rounded text-amber-950 font-normal"
+                                title={`Prefijo de remito: ${contact.empresaPrefix}`}
+                              >
+                                #{contact.empresaPrefix}
+                              </span>
+                            )}
+                          </div>
+                        ) : contact.empresa === 'Bosch & Cia' ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-900 border border-blue-300 shadow-2xs">
+                            <Building className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span>Bosch & Cia</span>
+                            {contact.empresaPrefix && (
+                              <span 
+                                className="text-[10px] font-mono px-1.5 py-0.2 bg-blue-200/60 rounded text-blue-950 font-normal"
+                                title={`Prefijo de remito: ${contact.empresaPrefix}`}
+                              >
+                                #{contact.empresaPrefix}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            <span>Empresa no detectada</span>
+                          </div>
+                        )}
+
+                        {/* Remito / Pedido */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-block bg-slate-100/90 text-slate-800 px-2 py-0.5 rounded border border-slate-200 text-xs font-semibold max-w-xs truncate" title={contact.pedido}>
+                            Remito: <span className="font-mono font-bold text-slate-900">{contact.pedido || 'Sin número'}</span>
+                          </span>
+                        </div>
+
+                        {/* Columnas adicionales de la planilla */}
+                        {contact.datosExtra && Object.keys(contact.datosExtra).length > 0 && (
+                          <div className="flex flex-wrap gap-1 text-[10px] text-slate-500 pt-0.5">
+                            {Object.entries(contact.datosExtra)
+                              .filter(([k, v]) => v && v !== contact.pedido && v !== contact.nombre && v !== contact.telefono)
+                              .slice(0, 2)
+                              .map(([k, v]) => (
+                                <span
+                                  key={k}
+                                  className="bg-slate-50 text-slate-600 border border-slate-200/60 px-1.5 py-0.5 rounded truncate max-w-[150px]"
+                                  title={`${k}: ${v}`}
+                                >
+                                  <span className="font-semibold text-slate-700">{k}:</span> {v}
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Estado */}

@@ -1,70 +1,72 @@
 import { Contact } from '../types';
 import { sanitizeAndFormatPhone } from '../utils/phoneFormatter';
+import { detectEmpresaFromRemito } from '../utils/empresaDetector';
 
-export const SAMPLE_CSV_CONTENT = `Nombre,Telefono,Pedido,Fecha,Detalle
-Carlos Rodríguez,+54 9 11 4512-8890,ORD-8492,15/09/2026,Zapatillas Deportivas Talle 42
-María Fernanda López,+52 55 4123 9901,ORD-8493,15/09/2026,Cafetera Espresso Automática
-Alejandro Gómez,+34 612 34 56 78,ORD-8494,15/09/2026,Auriculares Inalámbricos Pro
-Sofía Martínez,+57 300 456 7890,ORD-8495,15/09/2026,Kit de Skincare Facial
-Lucas Silva,+56 9 8765 4321,ORD-8496,15/09/2026,Reloj Inteligente Fit v2
-Valeria Morales,+51 912 345 678,ORD-8497,15/09/2026,Campera Impermeable Negra
-Andrés Benítez,1134567890,ORD-8498,15/09/2026,Mochila Urbana Antirrobo (Sin prefijo internacional)
-Laura Torres,+54 9 11 0000-00,ORD-8499,15/09/2026,Número incompleto para prueba de error`;
+export const SAMPLE_CSV_CONTENT = `Nombre,Telefono,Remito,Factura,Fecha
+Alejandro Cetani,+598 99 146 354,18178573,131059983,16/09/2026
+Mariana Benítez,098 765 432,950357776,304033377,16/09/2026
+Carlos Rodríguez,+54 9 11 4512-8890,41702911,136011808,16/09/2026
+Estela Silva,099 234 567,960162040,301400332,16/09/2026
+Gonzalo Méndez,091 889 900,13508192,135099112,16/09/2026
+Lucía Morales,094 556 778,301400332,301400332,16/09/2026
+Fernando Varela,092 112 233,136011808,136011808,16/09/2026
+Laura Torres,+54 9 11 00,950000000,302000000,16/09/2026`;
 
 export function getSampleContacts(): Contact[] {
   const rows = [
     {
+      nombre: 'Alejandro Cetani',
+      telefono: '+598 99 146 354',
+      pedido: '18178573',
+      extra: { 'Nro de Remito': '18178573', 'Nro Factura': '131059983', 'Fecha': '16/09/2026' },
+    },
+    {
+      nombre: 'Mariana Benítez',
+      telefono: '098 765 432',
+      pedido: '950357776',
+      extra: { 'Nro de Remito': '950357776', 'Nro Factura': '304033377', 'Fecha': '16/09/2026' },
+    },
+    {
       nombre: 'Carlos Rodríguez',
       telefono: '+54 9 11 4512-8890',
-      pedido: 'ORD-8492 (Zapatillas Deportivas Talle 42)',
-      extra: { Fecha: '15/09/2026', Producto: 'Zapatillas' },
+      pedido: '41702911',
+      extra: { 'Nro de Remito': '41702911', 'Nro Factura': '136011808', 'Fecha': '16/09/2026' },
     },
     {
-      nombre: 'María Fernanda López',
-      telefono: '+52 55 4123 9901',
-      pedido: 'ORD-8493 (Cafetera Espresso Automática)',
-      extra: { Fecha: '15/09/2026', Producto: 'Cafetera' },
+      nombre: 'Estela Silva',
+      telefono: '099 234 567',
+      pedido: '960162040',
+      extra: { 'Nro de Remito': '960162040', 'Nro Factura': '301400332', 'Fecha': '16/09/2026' },
     },
     {
-      nombre: 'Alejandro Gómez',
-      telefono: '+34 612 34 56 78',
-      pedido: 'ORD-8494 (Auriculares Inalámbricos Pro)',
-      extra: { Fecha: '15/09/2026', Producto: 'Auriculares' },
+      nombre: 'Gonzalo Méndez',
+      telefono: '091 889 900',
+      pedido: '13508192',
+      extra: { 'Nro de Remito': '13508192', 'Nro Factura': '135099112', 'Fecha': '16/09/2026' },
     },
     {
-      nombre: 'Sofía Martínez',
-      telefono: '+57 300 456 7890',
-      pedido: 'ORD-8495 (Kit de Skincare Facial)',
-      extra: { Fecha: '15/09/2026', Producto: 'Skincare' },
+      nombre: 'Lucía Morales',
+      telefono: '094 556 778',
+      pedido: '301400332',
+      extra: { 'Nro de Remito': '301400332', 'Nro Factura': '301400332', 'Fecha': '16/09/2026' },
     },
     {
-      nombre: 'Lucas Silva',
-      telefono: '+56 9 8765 4321',
-      pedido: 'ORD-8496 (Reloj Inteligente Fit v2)',
-      extra: { Fecha: '15/09/2026', Producto: 'Smartwatch' },
-    },
-    {
-      nombre: 'Valeria Morales',
-      telefono: '+51 912 345 678',
-      pedido: 'ORD-8497 (Campera Impermeable Negra)',
-      extra: { Fecha: '15/09/2026', Producto: 'Campera' },
-    },
-    {
-      nombre: 'Andrés Benítez',
-      telefono: '1134567890',
-      pedido: 'ORD-8498 (Mochila Antirrobo)',
-      extra: { Fecha: '15/09/2026', Producto: 'Mochila' },
+      nombre: 'Fernando Varela',
+      telefono: '092 112 233',
+      pedido: '136011808',
+      extra: { 'Nro de Remito': '136011808', 'Nro Factura': '136011808', 'Fecha': '16/09/2026' },
     },
     {
       nombre: 'Laura Torres',
       telefono: '+54 9 11 00',
-      pedido: 'ORD-8499 (Funda Silicona)',
-      extra: { Fecha: '15/09/2026', Producto: 'Funda' },
+      pedido: '950000000',
+      extra: { 'Nro de Remito': '950000000', 'Nro Factura': '302000000', 'Fecha': '16/09/2026' },
     },
   ];
 
   return rows.map((r, index) => {
     const phoneRes = sanitizeAndFormatPhone(r.telefono, 'auto');
+    const empRes = detectEmpresaFromRemito(r.pedido, r.extra);
     return {
       id: `sample-${index + 1}`,
       nombre: r.nombre,
@@ -73,6 +75,8 @@ export function getSampleContacts(): Contact[] {
       telefonoValido: phoneRes.isValid,
       telefonoError: phoneRes.error,
       pedido: r.pedido,
+      empresa: empRes.empresa,
+      empresaPrefix: empRes.matchedPrefix,
       estado: index === 0 ? 'Enviado' : 'Pendiente',
       enviadoAt: index === 0 ? 'Hoy 10:15 hs' : undefined,
       paisDetectado: phoneRes.country,

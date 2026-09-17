@@ -19,6 +19,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   const invalidos = contacts.filter((c) => !c.telefonoValido).length;
 
   const percentageSent = total > 0 ? Math.round((enviados / total) * 100) : 0;
+  const jcCount = contacts.filter((c) => c.empresa === 'Juan Construye').length;
+  const boschCount = contacts.filter((c) => c.empresa === 'Bosch & Cia').length;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
@@ -56,6 +58,17 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
             registros
           </span>
         </div>
+        {(jcCount > 0 || boschCount > 0) && (
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
+            <span className={currentFilter === 'all' ? 'text-amber-300' : 'text-amber-800'}>
+              JC: {jcCount}
+            </span>
+            <span className={currentFilter === 'all' ? 'text-slate-600' : 'text-slate-300'}>•</span>
+            <span className={currentFilter === 'all' ? 'text-blue-300' : 'text-blue-800'}>
+              Bosch: {boschCount}
+            </span>
+          </div>
+        )}
       </button>
 
       {/* Pendientes */}

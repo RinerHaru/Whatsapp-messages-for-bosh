@@ -170,6 +170,7 @@ export default function App() {
           onChangeConfig={setTemplateConfig}
           selectedContact={selectedContact}
           availableExtraColumns={extraColumns}
+          headers={headers}
         />
 
         {/* Paso 3: Tabla Interactiva con Envío a WhatsApp */}
