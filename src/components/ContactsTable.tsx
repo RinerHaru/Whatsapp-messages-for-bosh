@@ -253,7 +253,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                         No hay clientes cargados en la lista
                       </p>
                       <p className="text-xs text-slate-400">
-                        Sube un archivo .CSV en el Paso 1 o pega un enlace de Google Sheets.
+                        Sube un archivo Excel (.xlsx) / CSV en el Paso 1 o pega un enlace de Excel o Google Sheets.
                       </p>
                     </div>
                   ) : (

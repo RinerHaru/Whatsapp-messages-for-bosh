@@ -1,6 +1,6 @@
 {
   "name": "WhatsApp Notificador de Pedidos",
-  "description": "Aplicación web moderna para importar contactos desde CSV o Google Sheets y enviar notificaciones personalizadas de retiro de pedidos vía WhatsApp.",
+  "description": "Aplicación web moderna para importar contactos desde Excel, Google Sheets o CSV y enviar notificaciones personalizadas de retiro de pedidos vía WhatsApp.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

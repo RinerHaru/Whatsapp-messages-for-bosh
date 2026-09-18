@@ -70,7 +70,7 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
             }`}
           >
             <FileSpreadsheet className="w-4 h-4" />
-            1. Estructura CSV & Sheets
+            1. Excel, Sheets & CSV
           </button>
 
           <button
@@ -137,14 +137,30 @@ export const DocumentationModal: React.FC<DocumentationModalProps> = ({
                 <pre className="overflow-x-auto whitespace-pre">{SAMPLE_CSV_CONTENT}</pre>
               </div>
 
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-emerald-900">
-                <h5 className="font-bold mb-1">¿Cómo vincular una hoja de Google Sheets en vivo?</h5>
-                <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>Abre tu hoja de Google Sheets.</li>
-                  <li>Haz clic en el botón verde <strong>Compartir</strong> (arriba a la derecha).</li>
-                  <li>Cambia el acceso general a <strong>"Cualquier persona con el enlace"</strong> (modo Lector).</li>
-                  <li>Copia el enlace del navegador y pégalo en el Paso 1 de esta aplicación. ¡Listo!</li>
-                </ol>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-emerald-950">
+                  <h5 className="font-bold mb-1 flex items-center gap-1.5 text-emerald-900">
+                    <span>📊</span> Google Sheets
+                  </h5>
+                  <ol className="list-decimal list-inside space-y-1 text-xs text-emerald-900/90">
+                    <li>Abre tu hoja de Google Sheets.</li>
+                    <li>Haz clic en el botón <strong>Compartir</strong> (arriba a la derecha).</li>
+                    <li>Selecciona <strong>"Cualquier persona con el enlace"</strong> (Lector).</li>
+                    <li>Copia y pega la URL en el Paso 1 de la app.</li>
+                  </ol>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-blue-950">
+                  <h5 className="font-bold mb-1 flex items-center gap-1.5 text-blue-900">
+                    <span>📗</span> Excel (OneDrive / SharePoint)
+                  </h5>
+                  <ol className="list-decimal list-inside space-y-1 text-xs text-blue-900/90">
+                    <li>Abre tu archivo Excel en OneDrive o SharePoint.</li>
+                    <li>Haz clic en <strong>Compartir</strong> &gt; <strong>Copiar vínculo</strong>.</li>
+                    <li>Asegúrate de permitir acceso a cualquier persona con el vínculo.</li>
+                    <li>Pega el enlace en el Paso 1 (o arrastra el archivo .xlsx).</li>
+                  </ol>
+                </div>
               </div>
             </div>
           )}
