@@ -163,21 +163,85 @@ export async function parseExcelFile(
 }
 
 /**
- * Intenta descargar desde una URL de hoja de cálculo (Google Sheets o Excel)
- * Gestiona proxies de CORS en caso de ser necesario
+ * Convierte una cadena base64 en un ArrayBuffer
+ */
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Intenta descargar desde una URL de hoja de cálculo (Google Sheets, OneDrive, SharePoint o Excel Directo).
+ * Utiliza preferentemente la API backend /api/fetch-spreadsheet para evitar restricciones de CORS y procesar
+ * adecuadamente las sesiones de Microsoft OneDrive y SharePoint.
  */
 export async function fetchSpreadsheetData(
   inputUrl: string
 ): Promise<{ data: ArrayBuffer | string; isBinary: boolean; filenameSuggestion: string }> {
-  const { url, type } = normalizeSpreadsheetUrl(inputUrl);
+  const trimmed = inputUrl.trim();
+  if (!trimmed) {
+    throw new Error('La URL no puede estar vacía.');
+  }
 
-  // Lista de URLs a intentar (primero directa, luego con proxies seguros en caso de CORS de Microsoft/Dropbox)
+  // 1. Intentar primero a través del backend (/api/fetch-spreadsheet)
+  try {
+    const apiRes = await fetch('/api/fetch-spreadsheet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url: trimmed }),
+    });
+
+    const data = await apiRes.json();
+
+    if (apiRes.ok && data.success) {
+      if (data.isBinary && data.base64) {
+        const arrayBuffer = base64ToArrayBuffer(data.base64);
+        return {
+          data: arrayBuffer,
+          isBinary: true,
+          filenameSuggestion: data.filename || 'Libro de Excel',
+        };
+      } else if (typeof data.text === 'string') {
+        return {
+          data: data.text,
+          isBinary: false,
+          filenameSuggestion: data.filename || 'Hoja de datos',
+        };
+      }
+    }
+
+    // Si el backend devolvió un error explícito (ej. enlace privado o no compartido)
+    if (!apiRes.ok || data.error) {
+      throw new Error(data.error || `Error del servidor (HTTP ${apiRes.status})`);
+    }
+  } catch (backendError: any) {
+    // Si el mensaje del backend es un error de permisos o de OneDrive/Google claro, propagarlo
+    const msg = backendError?.message || '';
+    if (
+      msg.includes('privado') ||
+      msg.includes('permisos') ||
+      msg.includes('inicio de sesión') ||
+      msg.includes('Cualquier persona')
+    ) {
+      throw backendError;
+    }
+
+    // Si falló por otra causa en el backend, intentar fallback de descarga directa por el cliente
+    console.warn('Fallback al cliente tras error en backend:', backendError);
+  }
+
+  // 2. Fallback client-side directo en caso de enlaces con soporte CORS nativo
+  const { url, type } = normalizeSpreadsheetUrl(trimmed);
   const candidateUrls: string[] = [url];
-  
-  // Para OneDrive / SharePoint / Dropbox / etc., si falla CORS directo, intentamos con CORS proxy
   if (type !== 'google-sheets') {
     candidateUrls.push(`https://corsproxy.io/?url=${encodeURIComponent(url)}`);
-    candidateUrls.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
   }
 
   let lastError: any = null;
@@ -197,8 +261,6 @@ export async function fetchSpreadsheetData(
       }
 
       const contentType = response.headers.get('content-type') || '';
-      
-      // Si parece HTML (página de login de Microsoft o Google Docs no compartida)
       if (contentType.includes('text/html')) {
         const textSample = await response.clone().text();
         if (textSample.includes('<!DOCTYPE html>') || textSample.includes('<html') || textSample.includes('Sign in to your account')) {
@@ -206,8 +268,7 @@ export async function fetchSpreadsheetData(
         }
       }
 
-      // Detectar si es binario (Excel .xlsx / .xls / octet-stream / zip)
-      const isExcelBinary = 
+      const isExcelBinary =
         contentType.includes('spreadsheet') ||
         contentType.includes('excel') ||
         contentType.includes('officedocument') ||
@@ -225,7 +286,6 @@ export async function fetchSpreadsheetData(
           filenameSuggestion: type.startsWith('excel') ? 'Libro de Excel' : 'Hoja de cálculo',
         };
       } else {
-        // Asumir texto CSV
         const text = await response.text();
         return {
           data: text,
@@ -235,7 +295,6 @@ export async function fetchSpreadsheetData(
       }
     } catch (err: any) {
       lastError = err;
-      // Continuar al siguiente proxy candidato
     }
   }
 
