@@ -28,6 +28,7 @@ export interface TemplateConfig {
   defaultCountryCode: string; // e.g. '54', '52', '34', '57', etc.
   horario: string;
   tienda: string;
+  empresa?: string;
 }
 
 export interface CountryCodeOption {

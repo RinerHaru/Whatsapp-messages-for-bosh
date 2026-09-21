@@ -490,7 +490,7 @@ export const DataImporter: React.FC<DataImporterProps> = ({
                 ))}
               </select>
               <span className="block text-[10px] text-slate-400 mt-0.5">
-                Prefijos JC (181, 417, 135, 136) / Bosch (950, 960, 301, 304, 302)
+                Prefijos JC (181, 417, 135, 136, 170) / Bosch (950, 960, 301, 304, 302, 171)
               </span>
             </div>
           </div>

@@ -160,7 +160,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                 ? 'bg-amber-600 text-white shadow-2xs'
                 : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
             }`}
-            title="Filtrar clientes con remitos de Juan Construye (prefijos 181, 417, 135, 136)"
+            title="Filtrar clientes con remitos de Juan Construye (prefijos 181, 417, 135, 136, 170, 151)"
           >
             <Building2 className="w-3.5 h-3.5" />
             Juan Construye ({contacts.filter((c) => c.empresa === 'Juan Construye').length})
@@ -172,7 +172,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                 ? 'bg-blue-600 text-white shadow-2xs'
                 : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
             }`}
-            title="Filtrar clientes con remitos de Bosch & Cia (prefijos 950, 960, 301, 304, 302)"
+            title="Filtrar clientes con remitos de Bosch & Cia (prefijos 950, 960, 301, 304, 302, 171, 75)"
           >
             <Building className="w-3.5 h-3.5" />
             Bosch & Cia ({contacts.filter((c) => c.empresa === 'Bosch & Cia').length})

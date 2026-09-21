@@ -35,6 +35,7 @@ export default function App() {
   const [templateConfig, setTemplateConfig] = useState<TemplateConfig>({
     template: DEFAULT_TEMPLATE,
     defaultCountryCode: 'auto',
+    empresa: 'Juan Construye',
     horario: 'Lunes a Viernes de 09:00 a 19:00 hs',
     tienda: 'Local Central (Av. Corrientes 1234)',
   });

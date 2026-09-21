@@ -56,6 +56,9 @@ export function formatMessage(
       if (cleanKey.includes('vendedor')) {
         extraReplacements['{vendedor}'] = value;
       }
+      if (cleanKey === 'empresa' || cleanKey.includes('compania') || cleanKey.includes('razon_social')) {
+        extraReplacements['{empresa}'] = value;
+      }
 
       // Si una columna se llama literalmente "Nombre" pero no es la columna mapeada del cliente,
       // la ofrecemos como {columna_nombre} o {detalle_envio} para no sobreescribir {nombre}
@@ -63,11 +66,13 @@ export function formatMessage(
         extraReplacements['{columna_nombre}'] = value;
         extraReplacements['{detalle_linea}'] = value;
         extraReplacements['{tipo_envio}'] = value;
+        extraReplacements['{detalle_retiro}'] = value;
+        extraReplacements['{local_retiro}'] = value;
       }
     }
 
     // Aplicar reemplazos dinámicos que no colisionen con las palabras reservadas clave
-    const reservedKeys = ['{nombre}', '{name}', '{cliente}', '{pedido}', '{order}', '{empresa}', '{telefono}', '{phone}', '{celular}', '{tienda}', '{horario}'];
+    const reservedKeys = ['{nombre}', '{name}', '{cliente}', '{pedido}', '{order}', '{empresa}', '{telefono}', '{phone}', '{celular}', '{tienda}', '{local}', '{sucursal}', '{horario}'];
     for (const [placeholder, val] of Object.entries(extraReplacements)) {
       if (!reservedKeys.includes(placeholder.toLowerCase())) {
         const regex = new RegExp(escapeRegExp(placeholder), 'gi');
@@ -76,7 +81,29 @@ export function formatMessage(
     }
   }
 
-  // 2. Variables principales protegidas con MÁXIMA PRIORIDAD
+  // 2. Determinar el valor exacto de la empresa para {empresa}
+  // IMPORTANTE: Nunca debe mostrar la dirección o nombre del local (config.tienda).
+  // Prioridad:
+  // 1. Empresa detectada en el contacto (por prefijo de remito/factura)
+  // 2. Columna 'Empresa' / 'Compania' en los datos de la fila
+  // 3. Empresa configurada por el usuario en config.empresa
+  // 4. Empresa por defecto
+  let detectedEmpresa = contact.empresa;
+  if (!detectedEmpresa && contact.datosExtra) {
+    for (const [k, v] of Object.entries(contact.datosExtra)) {
+      const lk = k.toLowerCase().trim();
+      if (lk === 'empresa' || lk.includes('compan') || lk.includes('razon social')) {
+        if (v && String(v).trim()) {
+          detectedEmpresa = String(v).trim() as any;
+          break;
+        }
+      }
+    }
+  }
+
+  const finalEmpresa = detectedEmpresa || (config.empresa && config.empresa.trim()) || 'Juan Construye';
+
+  // 3. Variables principales protegidas con MÁXIMA PRIORIDAD
   // Estas NUNCA pueden ser desconfiguradas por una columna secundaria
   const coreReplacements: Record<string, string> = {
     '{nombre}': contact.nombre || 'estimado/a cliente',
@@ -84,9 +111,12 @@ export function formatMessage(
     '{cliente}': contact.nombre || 'estimado/a cliente',
     '{pedido}': contact.pedido || '#000',
     '{order}': contact.pedido || '#000',
-    '{empresa}': contact.empresa || config.tienda || 'nuestra empresa',
+    '{empresa}': finalEmpresa,
     '{horario}': config.horario || 'Lunes a Viernes de 09:00 a 18:00',
     '{tienda}': config.tienda || 'nuestro local',
+    '{local}': config.tienda || 'nuestro local',
+    '{sucursal}': config.tienda || 'nuestro local',
+    '{direccion_local}': config.tienda || 'nuestro local',
     '{telefono}': contact.telefono || '',
     '{phone}': contact.telefono || '',
     '{celular}': contact.telefono || '',
