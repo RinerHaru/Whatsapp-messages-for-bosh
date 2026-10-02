@@ -156,7 +156,8 @@ export function autoDetectColumns(headers: string[]): ColumnMapping {
 export function parseCSVData(
   csvText: string,
   defaultCountryCode = 'auto',
-  overrideMapping?: Partial<ColumnMapping>
+  overrideMapping?: Partial<ColumnMapping>,
+  sourceName?: string
 ): ParseCSVResult {
   const errors: string[] = [];
   const parsed = Papa.parse<Record<string, string>>(csvText, {
@@ -204,7 +205,7 @@ export function parseCSVData(
     const empresaResult = detectEmpresaFromRemito(cleanPedido, extra);
 
     return {
-      id: `contact-${Date.now()}-${index}`,
+      id: `contact-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
       nombre: String(nombre).trim(),
       telefono: String(rawTelefono).trim(),
       telefonoFormateado: phoneResult.formatted,
@@ -216,6 +217,7 @@ export function parseCSVData(
       estado: 'Pendiente',
       paisDetectado: phoneResult.country,
       datosExtra: extra,
+      origenArchivo: sourceName,
     };
   });
 

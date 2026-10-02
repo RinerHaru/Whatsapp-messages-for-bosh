@@ -15,6 +15,15 @@ export interface Contact {
   enviadoAt?: string;
   paisDetectado?: { name: string; flag: string; dialCode: string };
   datosExtra?: Record<string, string>;
+  origenArchivo?: string;
+}
+
+export interface ImportStats {
+  addedCount: number;
+  duplicateCount: number;
+  totalCount: number;
+  wasSampleReplaced: boolean;
+  sourceName?: string;
 }
 
 export interface ColumnMapping {

@@ -10,20 +10,34 @@ import {
   Layers,
   HelpCircle,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Files
 } from 'lucide-react';
-import { ColumnMapping, Contact } from '../types';
+import { ColumnMapping, Contact, ImportStats } from '../types';
 import { parseCSVData } from '../utils/csvParser';
 import { fetchSpreadsheetData, convertExcelToCSV } from '../utils/excelParser';
 
 interface DataImporterProps {
-  onImportSuccess: (contacts: Contact[], headers: string[], mapping: ColumnMapping, rawText?: string) => void;
+  onImportSuccess: (
+    contacts: Contact[],
+    headers: string[],
+    mapping: ColumnMapping,
+    rawText?: string,
+    mode?: 'append' | 'replace'
+  ) => ImportStats | void;
   defaultCountryCode: string;
   onCountryCodeChange: (code: string) => void;
   headers: string[];
   currentMapping: ColumnMapping;
   onMappingChange: (mapping: ColumnMapping) => void;
   rawCsvText: string;
+  importMode: 'append' | 'replace';
+  onImportModeChange: (mode: 'append' | 'replace') => void;
+  totalContactsCount: number;
+  onClearContacts: () => void;
 }
 
 export const DataImporter: React.FC<DataImporterProps> = ({
@@ -33,6 +47,10 @@ export const DataImporter: React.FC<DataImporterProps> = ({
   currentMapping,
   onMappingChange,
   rawCsvText,
+  importMode,
+  onImportModeChange,
+  totalContactsCount,
+  onClearContacts,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [sheetUrl, setSheetUrl] = useState('');
@@ -50,59 +68,126 @@ export const DataImporter: React.FC<DataImporterProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Procesador principal de texto CSV
-  const processRawText = (text: string, sourceName = 'Hoja de Cálculo') => {
+  const processRawText = (text: string, sourceName = 'Hoja de Cálculo', modeOverride?: 'append' | 'replace') => {
     try {
-      const result = parseCSVData(text, defaultCountryCode);
+      const result = parseCSVData(text, defaultCountryCode, undefined, sourceName);
 
       if (result.contacts.length === 0) {
         setErrorMessage('No se encontraron registros de clientes válidos en el archivo o la hoja seleccionada.');
         return;
       }
 
-      onImportSuccess(result.contacts, result.headers, result.detectedMapping, text);
-      setSuccessInfo(`¡Cargados ${result.contacts.length} contactos desde ${sourceName}!`);
+      const stats = onImportSuccess(result.contacts, result.headers, result.detectedMapping, text, modeOverride);
+
+      if (stats) {
+        if (stats.wasSampleReplaced) {
+          setSuccessInfo(`¡Cargados ${stats.addedCount} contactos desde ${sourceName}! Se reemplazaron los datos de muestra iniciales (Total: ${stats.totalCount} contactos).`);
+        } else if (importMode === 'replace' && !modeOverride) {
+          setSuccessInfo(`¡Lista reemplazada! Cargados ${stats.addedCount} contactos desde ${sourceName}.`);
+        } else {
+          // Modo Añadir / Acumular
+          let msg = `¡Se añadieron ${stats.addedCount} contactos desde "${sourceName}"! Total acumulado en la lista: ${stats.totalCount} contactos.`;
+          if (stats.duplicateCount > 0) {
+            msg += ` (${stats.duplicateCount} registros duplicados ya existentes fueron omitidos)`;
+          }
+          setSuccessInfo(msg);
+        }
+      } else {
+        setSuccessInfo(`¡Cargados ${result.contacts.length} contactos desde ${sourceName}!`);
+      }
     } catch (err: any) {
       setErrorMessage(`Error al procesar los datos: ${err.message || err}`);
     }
   };
 
-  // Manejo de archivo local (Excel .xlsx, .xls o CSV .csv)
-  const handleFileUpload = async (file: File) => {
+  // Manejo de múltiples archivos o archivo individual (Excel .xlsx, .xls o CSV .csv)
+  const handleFilesUpload = async (fileList: FileList | File[]) => {
     setErrorMessage(null);
     setSuccessInfo(null);
 
-    const lowerName = file.name.toLowerCase();
-    const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
-    const isCsv = lowerName.endsWith('.csv') || file.type === 'text/csv';
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
 
-    if (!isExcel && !isCsv) {
-      setErrorMessage('Por favor sube un archivo con formato Excel (.xlsx, .xls) o CSV (.csv)');
+    // Si es un solo archivo
+    if (files.length === 1) {
+      const file = files[0];
+      const lowerName = file.name.toLowerCase();
+      const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+      const isCsv = lowerName.endsWith('.csv') || file.type === 'text/csv';
+
+      if (!isExcel && !isCsv) {
+        setErrorMessage('Por favor sube un archivo con formato Excel (.xlsx, .xls) o CSV (.csv)');
+        return;
+      }
+
+      try {
+        if (isExcel) {
+          const arrayBuffer = await file.arrayBuffer();
+          const { csvText, sheetNames, activeSheet: firstSheet } = convertExcelToCSV(arrayBuffer, 0);
+          setExcelBuffer(arrayBuffer);
+          setExcelSheetNames(sheetNames);
+          setActiveSheet(firstSheet);
+          setCurrentSourceName(file.name);
+          processRawText(csvText, `${file.name} (Hoja: "${firstSheet}")`);
+        } else {
+          const text = await file.text();
+          if (!text.trim()) {
+            setErrorMessage('El archivo CSV está vacío.');
+            return;
+          }
+          setExcelBuffer(null);
+          setExcelSheetNames([]);
+          setActiveSheet('');
+          setCurrentSourceName(file.name);
+          processRawText(text, file.name);
+        }
+      } catch (err: any) {
+        setErrorMessage(`Error al leer el archivo: ${err.message || err}`);
+      }
       return;
     }
 
-    try {
-      if (isExcel) {
-        const arrayBuffer = await file.arrayBuffer();
-        const { csvText, sheetNames, activeSheet: firstSheet } = convertExcelToCSV(arrayBuffer, 0);
-        setExcelBuffer(arrayBuffer);
-        setExcelSheetNames(sheetNames);
-        setActiveSheet(firstSheet);
-        setCurrentSourceName(file.name);
-        processRawText(csvText, `Excel: ${file.name} (Hoja: "${firstSheet}")`);
-      } else {
-        const text = await file.text();
-        if (!text.trim()) {
-          setErrorMessage('El archivo CSV está vacío.');
-          return;
+    // Múltiples archivos seleccionados a la vez
+    let totalAdded = 0;
+    let totalDuplicates = 0;
+    let successfulFiles = 0;
+
+    for (const file of files) {
+      const lowerName = file.name.toLowerCase();
+      const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+      const isCsv = lowerName.endsWith('.csv') || file.type === 'text/csv';
+
+      if (!isExcel && !isCsv) continue;
+
+      try {
+        let csv = '';
+        if (isExcel) {
+          const buf = await file.arrayBuffer();
+          const converted = convertExcelToCSV(buf, 0);
+          csv = converted.csvText;
+        } else {
+          csv = await file.text();
         }
-        setExcelBuffer(null);
-        setExcelSheetNames([]);
-        setActiveSheet('');
-        setCurrentSourceName(file.name);
-        processRawText(text, `CSV: ${file.name}`);
+
+        const parsed = parseCSVData(csv, defaultCountryCode, undefined, file.name);
+        if (parsed.contacts.length > 0) {
+          const stats = onImportSuccess(parsed.contacts, parsed.headers, parsed.detectedMapping, csv, 'append');
+          totalAdded += stats?.addedCount ?? parsed.contacts.length;
+          totalDuplicates += stats?.duplicateCount ?? 0;
+          successfulFiles++;
+        }
+      } catch (err) {
+        console.error(`Error procesando archivo ${file.name}:`, err);
       }
-    } catch (err: any) {
-      setErrorMessage(`Error al leer el archivo: ${err.message || err}`);
+    }
+
+    if (successfulFiles > 0) {
+      setSuccessInfo(
+        `¡Se procesaron ${successfulFiles} archivos con éxito! Se añadieron ${totalAdded} contactos nuevos a la lista.` +
+        (totalDuplicates > 0 ? ` (${totalDuplicates} duplicados omitidos)` : '')
+      );
+    } else {
+      setErrorMessage('No se pudieron procesar los archivos seleccionados.');
     }
   };
 
@@ -158,9 +243,45 @@ export const DataImporter: React.FC<DataImporterProps> = ({
     try {
       const { csvText, activeSheet: sheetSelected } = convertExcelToCSV(excelBuffer, newSheetName);
       setActiveSheet(sheetSelected);
-      processRawText(csvText, `Excel: ${currentSourceName} (Hoja: "${sheetSelected}")`);
+      processRawText(csvText, `${currentSourceName} (Hoja: "${sheetSelected}")`);
     } catch (err: any) {
       setErrorMessage(`Error al cambiar de hoja: ${err.message || err}`);
+    }
+  };
+
+  // Procesar y añadir TODAS las hojas del archivo Excel cargado en un solo paso
+  const handleLoadAllSheets = () => {
+    if (!excelBuffer || excelSheetNames.length === 0) return;
+    try {
+      const allContacts: Contact[] = [];
+      const allHeadersSet = new Set<string>();
+      let detectedMap = currentMapping;
+
+      for (const sheet of excelSheetNames) {
+        const { csvText } = convertExcelToCSV(excelBuffer, sheet);
+        const parsed = parseCSVData(csvText, defaultCountryCode, undefined, `${currentSourceName} [${sheet}]`);
+        if (parsed.contacts.length > 0) {
+          allContacts.push(...parsed.contacts);
+          parsed.headers.forEach((h) => allHeadersSet.add(h));
+          if (!detectedMap.nombreCol && parsed.detectedMapping.nombreCol) {
+            detectedMap = parsed.detectedMapping;
+          }
+        }
+      }
+
+      if (allContacts.length === 0) {
+        setErrorMessage('No se encontraron registros de clientes en las hojas del archivo Excel.');
+        return;
+      }
+
+      const mergedHeaders = Array.from(allHeadersSet);
+      const stats = onImportSuccess(allContacts, mergedHeaders, detectedMap, undefined, 'append');
+
+      setSuccessInfo(
+        `¡Se importaron las ${excelSheetNames.length} hojas de Excel! Se añadieron ${stats?.addedCount ?? allContacts.length} contactos a la lista (Total: ${stats?.totalCount ?? allContacts.length}).`
+      );
+    } catch (err: any) {
+      setErrorMessage(`Error al procesar todas las hojas: ${err.message || err}`);
     }
   };
 
@@ -168,10 +289,6 @@ export const DataImporter: React.FC<DataImporterProps> = ({
   const handleColumnChange = (field: keyof ColumnMapping, newCol: string) => {
     const updated = { ...currentMapping, [field]: newCol };
     onMappingChange(updated);
-    if (rawCsvText) {
-      const reParsed = parseCSVData(rawCsvText, defaultCountryCode, updated);
-      onImportSuccess(reParsed.contacts, reParsed.headers, updated, rawCsvText);
-    }
   };
 
   // Detectar servicio en tiempo real al escribir URL
@@ -257,6 +374,59 @@ export const DataImporter: React.FC<DataImporterProps> = ({
         </div>
       )}
 
+      {/* Barra de Modo de Importación y Control de Acumulación */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200/90 rounded-xl p-3 sm:px-4 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-slate-700">Comportamiento al cargar planillas:</span>
+          <div className="inline-flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300/50">
+            <button
+              type="button"
+              onClick={() => onImportModeChange('append')}
+              className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs ${
+                importMode === 'append'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Conserva todos los contactos cargados previamente y añade los de la nueva planilla"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Añadir a la lista (Acumular)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onImportModeChange('replace')}
+              className={`px-3 py-1 rounded-md font-semibold transition-all flex items-center gap-1.5 text-xs ${
+                importMode === 'replace'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Borra la lista anterior y deja únicamente los datos de la nueva planilla"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Reemplazar lista</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200/70">
+          <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+            <Files className="w-4 h-4 text-emerald-600" />
+            <span>Contactos acumulados: <strong className="text-slate-900 font-bold">{totalContactsCount}</strong></span>
+          </div>
+          {totalContactsCount > 0 && (
+            <button
+              type="button"
+              onClick={onClearContacts}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors font-medium text-[11px]"
+              title="Vaciar la lista para comenzar una nueva tanda"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Vaciar lista</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Grid de Métodos de Carga */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
@@ -270,8 +440,8 @@ export const DataImporter: React.FC<DataImporterProps> = ({
           onDrop={(e) => {
             e.preventDefault();
             setDragOver(false);
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-              handleFileUpload(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              handleFilesUpload(e.dataTransfer.files);
             }
           }}
           onClick={() => fileInputRef.current?.click()}
@@ -284,11 +454,12 @@ export const DataImporter: React.FC<DataImporterProps> = ({
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
             className="hidden"
             onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                handleFileUpload(e.target.files[0]);
+              if (e.target.files && e.target.files.length > 0) {
+                handleFilesUpload(e.target.files);
               }
             }}
           />
@@ -301,17 +472,20 @@ export const DataImporter: React.FC<DataImporterProps> = ({
             </div>
           </div>
           <span className="text-sm font-semibold text-slate-800">
-            Subir archivo Excel o CSV (.xlsx, .xls, .csv)
+            Subir archivo(s) Excel o CSV (.xlsx, .xls, .csv)
           </span>
           <p className="text-xs text-slate-400 mt-1 max-w-xs">
-            Haz clic o arrastra tu archivo Excel o CSV directamente aquí
+            Haz clic o arrastra 1 o más archivos para añadirlos a la lista
           </p>
-          <div className="flex items-center gap-1.5 mt-2.5">
+          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap justify-center">
             <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
               Excel .XLSX / .XLS
             </span>
             <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
               .CSV
+            </span>
+            <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+              Múltiples planillas soportadas
             </span>
           </div>
         </div>
@@ -403,7 +577,7 @@ export const DataImporter: React.FC<DataImporterProps> = ({
               <span className="text-blue-700">Selecciona la pestaña a procesar</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-semibold text-blue-900">Hoja activa:</span>
             <select
               value={activeSheet}
@@ -416,6 +590,15 @@ export const DataImporter: React.FC<DataImporterProps> = ({
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={handleLoadAllSheets}
+              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+              title="Procesa y añade los clientes de todas las hojas de este libro"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Añadir todas las hojas ({excelSheetNames.length})</span>
+            </button>
           </div>
         </div>
       )}

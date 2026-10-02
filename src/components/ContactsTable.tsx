@@ -29,6 +29,7 @@ interface ContactsTableProps {
   onDeleteContact: (contactId: string) => void;
   onSelectContactForPreview: (contact: Contact) => void;
   selectedContactId?: string;
+  onClearContacts?: () => void;
 }
 
 export const ContactsTable: React.FC<ContactsTableProps> = ({
@@ -39,6 +40,7 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
   onDeleteContact,
   onSelectContactForPreview,
   selectedContactId,
+  onClearContacts,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Pendiente' | 'Enviado' | 'invalid' | 'Juan Construye' | 'Bosch & Cia'>('all');
@@ -135,6 +137,18 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
             >
               <ArrowRightCircle className="w-4 h-4" />
               Enviar Siguiente ({nextPending.nombre.split(' ')[0]})
+            </button>
+          )}
+
+          {onClearContacts && contacts.length > 0 && (
+            <button
+              onClick={onClearContacts}
+              type="button"
+              className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-300/80 rounded-lg transition-colors"
+              title="Vaciar todos los contactos de la lista"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Vaciar</span>
             </button>
           )}
         </div>
@@ -368,11 +382,19 @@ export const ContactsTable: React.FC<ContactsTableProps> = ({
                           </div>
                         )}
 
-                        {/* Remito / Pedido */}
+                        {/* Remito / Pedido y Origen de Archivo */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="inline-block bg-slate-100/90 text-slate-800 px-2 py-0.5 rounded border border-slate-200 text-xs font-semibold max-w-xs truncate" title={contact.pedido}>
                             Remito: <span className="font-mono font-bold text-slate-900">{contact.pedido || 'Sin número'}</span>
                           </span>
+                          {contact.origenArchivo && (
+                            <span 
+                              className="inline-block bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded border border-slate-200 max-w-[170px] truncate"
+                              title={`Planilla: ${contact.origenArchivo}`}
+                            >
+                              📄 {contact.origenArchivo}
+                            </span>
+                          )}
                         </div>
 
                         {/* Columnas adicionales de la planilla */}
